@@ -1,0 +1,7 @@
+name: UnnamedGunGame
+version: '${project.version}'
+main: me.onatic.unnamedgungame.UnnamedGunGame
+api-version: '1.20'
+commands:
+  ugg:
+    description: Main command for the UnnamedGunGame plugin
