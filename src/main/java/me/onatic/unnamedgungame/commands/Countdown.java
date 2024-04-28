@@ -3,8 +3,11 @@ package me.onatic.unnamedgungame.commands;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.ClickEvent;
 
 public class Countdown {
 
@@ -12,9 +15,18 @@ public class Countdown {
     private boolean broadcast;
     private BukkitRunnable task;
     private CommandSender sender;
+    private Player target;
+    private boolean requestAccepted = false; // New field
 
+    // Constructor for when no target player is specified
     public Countdown(CommandSender sender, String[] args) {
+        this(sender, null, args); // Call the other constructor with 'null' as the target player
+    }
+
+    // Constructor for when a target player is specified
+    public Countdown(CommandSender sender, Player target, String[] args) {
         this.sender = sender;
+        this.target = target;
 
         if (args.length < 2) {
             sender.sendMessage("Usage: /ugg countdown <time> [broadcast]");
@@ -40,9 +52,38 @@ public class Countdown {
                 throw new IllegalArgumentException("Invalid time format: " + args[i]);
             }
         }
+
+        if (this.totalSeconds <= 0) {
+            throw new IllegalArgumentException("Invalid time: " + args[1]);
+        }
+
+        if (target instanceof Player) {
+            Player targetPlayer = (Player) target;
+            TextComponent message = new TextComponent("You have received a countdown request. ");
+            TextComponent accept = new TextComponent("[ACCEPT]");
+            accept.setColor(net.md_5.bungee.api.ChatColor.GREEN);
+            accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ugg accept"));
+            TextComponent deny = new TextComponent("[DENY]");
+            deny.setColor(net.md_5.bungee.api.ChatColor.RED);
+            deny.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ugg deny"));
+            message.addExtra(accept);
+            message.addExtra(" ");
+            message.addExtra(deny);
+            targetPlayer.spigot().sendMessage(message);
+        } else if (args[args.length - 1].equalsIgnoreCase("broadcast")) {
+            this.broadcast = true;
+            if (!sender.hasPermission("countdown.broadcast")) {
+                throw new IllegalArgumentException("You do not have permission to broadcast the countdown");
+            }
+        }
     }
 
     public void start() {
+        if (target instanceof Player && !requestAccepted) {
+            sender.sendMessage("The countdown request has not been accepted by the target player.");
+            return;
+        }
+
         task = new BukkitRunnable() {
             int remainingSeconds = totalSeconds;
 
@@ -82,11 +123,23 @@ public class Countdown {
             Bukkit.broadcastMessage(message);
         } else {
             sender.sendMessage(message);
+            if (target != null) {
+                target.sendMessage(message);
+            }
         }
     }
+
     public boolean isBroadcast() {
         return broadcast;
     }
+
+    public void acceptRequest() {
+        this.requestAccepted = true;
+        if (target instanceof Player || broadcast || totalSeconds > 0) {
+            start();
+        }
+    }
+
     public void cancel() {
         if (task != null) {
             task.cancel();
