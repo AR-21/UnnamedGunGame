@@ -1,10 +1,12 @@
 package me.onatic.unnamedgungame.commands;
 
+import me.onatic.unnamedgungame.listeners.BarricadeListener;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -80,6 +82,17 @@ public class CommandManager implements CommandExecutor {
                     }
                     break;
 
+                case "barricade":
+                    if (sender instanceof Player) {
+                        Player player = (Player) sender;
+                        BarricadeListener barricadeListener = new BarricadeListener();
+                        ItemStack barricadeItem = barricadeListener.createBarricadeItem();
+                        player.getInventory().addItem(barricadeItem);
+                        player.sendMessage("You have received a deployable barricade!");
+                    } else {
+                        sender.sendMessage("This command can only be run by a player.");
+                    }
+                    break;
                 default:
                     sendCommandList(sender);
                     break;
