@@ -25,56 +25,60 @@ public class CommandManager implements CommandExecutor {
 
             switch (args[0].toLowerCase()) {
                 case "countdown":
-                    Countdown countdown = countdowns.get(sender);
-                    if (countdown != null) {
-                        countdown.cancel();
-                    }
-
-                    try {
-                        if (args.length > 2 && args[args.length - 2].equalsIgnoreCase("request")) {
-                            Player target = Bukkit.getPlayer(args[args.length - 1]);
-                            if (target == null) {
-                                sender.sendMessage("Player not found.");
-                                return true;
-                            }
-                            countdown = new Countdown(sender, target, Arrays.copyOf(args, args.length - 2));
-                            countdowns.put(sender, countdown);
-                        } else {
-                            countdown = new Countdown(sender, args);
-                            if (countdown.isBroadcast()) {
-                                if (broadcastCountdown != null) {
-                                    broadcastCountdown.cancel();
+                    if (args.length > 1) {
+                        switch (args[1].toLowerCase()) {
+                            case "accept":
+                                Countdown countdown = countdowns.get(sender);
+                                if (countdown != null) {
+                                    countdown.acceptRequest();
+                                } else {
+                                    sender.sendMessage("No countdown request to accept.");
                                 }
-                                broadcastCountdown = countdown;
-                            }
-                            countdown.start();
-                            countdowns.put(sender, countdown);
+                                break;
+
+                            case "deny":
+                                countdown = countdowns.get(sender);
+                                if (countdown != null) {
+                                    countdown.cancel();
+                                    countdowns.remove(sender);
+                                } else {
+                                    sender.sendMessage("No countdown request to deny.");
+                                }
+                                break;
+
+                            default:
+                                countdown = countdowns.get(sender);
+                                if (countdown != null) {
+                                    countdown.cancel();
+                                }
+
+                                try {
+                                    if (args.length > 2 && args[args.length - 2].equalsIgnoreCase("request")) {
+                                        Player target = Bukkit.getPlayer(args[args.length - 1]);
+                                        if (target == null) {
+                                            sender.sendMessage("Player not found.");
+                                            return true;
+                                        }
+                                        countdown = new Countdown(sender, target, Arrays.copyOf(args, args.length - 2));
+                                        countdowns.put(sender, countdown);
+                                    } else {
+                                        countdown = new Countdown(sender, args);
+                                        if (countdown.isBroadcast()) {
+                                            if (broadcastCountdown != null) {
+                                                broadcastCountdown.cancel();
+                                            }
+                                            broadcastCountdown = countdown;
+                                        }
+                                        countdown.start();
+                                        countdowns.put(sender, countdown);
+                                    }
+                                } catch (IllegalArgumentException e) {
+                                    sender.sendMessage("Correct format: /ugg countdown <time> [broadcast]");
+                                }
+                                break;
                         }
-                    } catch (IllegalArgumentException e) {
-                        sender.sendMessage("Correct format: /ugg countdown <time> [broadcast]");
                     }
                     break;
-
-                case "accept":
-                    countdown = countdowns.get(sender);
-                    if (countdown != null) {
-                        countdown.acceptRequest();
-                    } else {
-                        sender.sendMessage("No countdown request to accept.");
-                    }
-                    break;
-
-                case "deny":
-                    countdown = countdowns.get(sender);
-                    if (countdown != null) {
-                        countdown.cancel();
-                        countdowns.remove(sender);
-                    } else {
-                        sender.sendMessage("No countdown request to deny.");
-                    }
-                    break;
-
-                // Add more cases for other subcommands
 
                 default:
                     sendCommandList(sender);
@@ -86,6 +90,7 @@ public class CommandManager implements CommandExecutor {
 
         return false;
     }
+
     private void sendCommandList(CommandSender sender) {
         sender.sendMessage("List of available commands:");
         sender.sendMessage("/ugg countdown <Hours> <Minutes> <Seconds> ");

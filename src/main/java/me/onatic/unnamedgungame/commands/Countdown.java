@@ -62,10 +62,12 @@ public class Countdown {
             TextComponent message = new TextComponent("You have received a countdown request. ");
             TextComponent accept = new TextComponent("[ACCEPT]");
             accept.setColor(net.md_5.bungee.api.ChatColor.GREEN);
-            accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ugg accept"));
+            accept.setBold(true); // Make the text bold
+            accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ugg countdown accept"));
             TextComponent deny = new TextComponent("[DENY]");
             deny.setColor(net.md_5.bungee.api.ChatColor.RED);
-            deny.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ugg deny"));
+            deny.setBold(true); // Make the text bold
+            deny.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ugg countdown deny"));
             message.addExtra(accept);
             message.addExtra(" ");
             message.addExtra(deny);
@@ -133,20 +135,31 @@ public class Countdown {
         return broadcast;
     }
 
-    public void acceptRequest() {
-        this.requestAccepted = true;
-        if (target instanceof Player || broadcast || totalSeconds > 0) {
-            start();
-        }
+public void acceptRequest() {
+    if (this.requestAccepted) {
+        return;
     }
+    this.requestAccepted = true;
+    if (target instanceof Player || broadcast || totalSeconds > 0) {
+        start();
+    }
+    sender.sendMessage("Countdown request has been accepted.");
+    if (target instanceof Player) {
+        target.sendMessage("You have accepted the countdown request.");
+    }
+}
 
-    public void cancel() {
-        if (task != null) {
-            task.cancel();
-            task = null;
-        }
-        if (this == CommandManager.getBroadcastCountdown()) {
-            CommandManager.setBroadcastCountdown(null);
-        }
+public void cancel() {
+    if (task != null) {
+        task.cancel();
+        task = null;
     }
+    if (this == CommandManager.getBroadcastCountdown()) {
+        CommandManager.setBroadcastCountdown(null);
+    }
+    sender.sendMessage("Countdown request has been denied.");
+    if (target instanceof Player) {
+        target.sendMessage("You have denied the countdown request.");
+    }
+}
 }
