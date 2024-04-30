@@ -1,12 +1,14 @@
 package me.onatic.unnamedgungame.listeners;
 
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
+import com.sk89q.worldguard.WorldGuard;
+import com.sk89q.worldguard.protection.flags.StateFlag;
+import com.sk89q.worldguard.protection.regions.RegionContainer;
+import com.sk89q.worldguard.protection.regions.RegionQuery;
 import me.onatic.unnamedgungame.BlockData;
 import me.onatic.unnamedgungame.UnnamedGunGame;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Bisected;
@@ -25,17 +27,23 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
+import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
+import com.sk89q.worldguard.protection.ApplicableRegionSet;
+import com.sk89q.worldguard.protection.managers.RegionManager;
+import com.sk89q.worldguard.protection.regions.ProtectedRegion;
+
 import java.util.HashMap;
 import java.util.Map;
-
 import java.util.Random;
 
 public class BarricadeListener implements Listener {
 
     private static final String BARRICADE_ITEM_NAME = "Deployable Barricade";
     private boolean deployableBarricadeUsed = false;
-    private static final long COOLDOWN = 20L * 20;
+    private static final long COOLDOWN = 20L * 15;
+
     private Map<Player, Boolean> cooldowns = new HashMap<>();
+    private Map<Player, Long> soundCooldowns = new HashMap<>();
 
     private static final BlockData[][][][] STRUCTURES = new BlockData[][][][]{
             // First structure
@@ -192,12 +200,24 @@ public class BarricadeListener implements Listener {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
 
+
         // Check if the player is holding the barricade item
         if (item != null && item.getType() == Material.STICK && item.hasItemMeta()) {
             ItemMeta meta = item.getItemMeta();
             if (meta.hasDisplayName() && meta.getDisplayName().contains(BARRICADE_ITEM_NAME)) {
+
+                // Check if the player is in a region with the use-barricade flag
+                if (!canUseBarricade(player.getLocation())) {
+                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You can't use that here"));
+                    return;
+                }
                 // Check if the player is on cooldown
                 if (cooldowns.containsKey(player)) {
+                        long lastSoundPlayed = soundCooldowns.getOrDefault(player, 0L);
+                        if (System.currentTimeMillis() - lastSoundPlayed >= 1000) {
+                            player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_PLACE, 1.0F, 1.0F);
+                            soundCooldowns.put(player, System.currentTimeMillis());
+                        }
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "" + ChatColor.BOLD + "Not Ready!"));
                     event.setCancelled(true); // Cancel the event to prevent the barricade from being thrown
                 } else {
@@ -209,6 +229,7 @@ public class BarricadeListener implements Listener {
                         deployableBarricadeUsed = true;
                         cooldowns.put(player, true);
 
+                        player.playSound(player.getLocation(), Sound.ENTITY_BAT_TAKEOFF, 1.0F, 1.0F);
                         // Schedule a task to remove the player from the cooldown list after the cooldown period
                         new BukkitRunnable() {
                             @Override
@@ -229,6 +250,10 @@ public class BarricadeListener implements Listener {
                 Egg egg = (Egg) event.getEntity();
                 if (egg.getShooter() instanceof Player) {
                     Player player = (Player) egg.getShooter();
+                    // Check if the player is in a region with the use-barricade flag
+                    if (!canUseBarricade(player.getLocation())) {
+                        return;
+                    }
                     Vector direction = player.getLocation().getDirection();
                     BlockFace facing = getFacingDirection(direction);
                     int structureIndex = new Random().nextInt(STRUCTURES.length);
@@ -273,26 +298,35 @@ public class BarricadeListener implements Listener {
                         throw new IllegalStateException("Unexpected value: " + facing);
                 }
                 if (block.getType() == Material.AIR) {
+                    // Save the block below the barricade
+                    for (int dx = -2; dx <= 2; dx++) {
+                        for (int dz = -2; dz <= 2; dz++) {
+                            Block belowBlock = location.getWorld().getBlockAt(block.getX() + dx, block.getY() - 2, block.getZ() + dz);
+                            originalBlocks.put(belowBlock.getLocation(), belowBlock.getType());
+                        }
+                    }
+
                     originalBlocks.put(block.getLocation(), block.getType());
                     block.setType(blockData.getMaterial());
-                if (block.getBlockData() instanceof Stairs) {
-                    Stairs stairs = (Stairs) block.getBlockData();
-                    stairs.setFacing(blockData.getBlockFace());
-                    stairs.setHalf(blockData.isUpsideDown() ? Bisected.Half.TOP : Bisected.Half.BOTTOM);
-                    block.setBlockData(stairs);
+                    if (block.getBlockData() instanceof Stairs) {
+                        Stairs stairs = (Stairs) block.getBlockData();
+                        stairs.setFacing(blockData.getBlockFace());
+                        stairs.setHalf(blockData.isUpsideDown() ? Bisected.Half.TOP : Bisected.Half.BOTTOM);
+                        block.setBlockData(stairs);
+                    }
                 }
             }
         }
-    }
         startBarricadeTimer(originalBlocks);
-}
+    }
+
     private void startBarricadeTimer(Map<Location, Material> originalBlocks) {
         Bukkit.getScheduler().scheduleSyncDelayedTask(JavaPlugin.getProvidingPlugin(getClass()), () -> {
             for (Map.Entry<Location, Material> entry : originalBlocks.entrySet()) {
                 entry.getKey().getBlock().setType(entry.getValue());
             }
             originalBlocks.clear();
-        }, 20L * 15); // 5 minutes
+        }, 20L * 10); // 10 seconds
         }
     public ItemStack createBarricadeItem() {
         ItemStack barricadeItem = new ItemStack(Material.STICK);
@@ -301,4 +335,18 @@ public class BarricadeListener implements Listener {
         barricadeItem.setItemMeta(meta);
         return barricadeItem;
     }
+private boolean canUseBarricade(Location location) {
+    RegionContainer container = WorldGuard.getInstance().getPlatform().getRegionContainer();
+    RegionQuery query = container.createQuery();
+    ApplicableRegionSet applicableRegions = query.getApplicableRegions(BukkitAdapter.adapt(location));
+
+    for (ProtectedRegion region : applicableRegions) {
+        StateFlag.State flagState = region.getFlag(UnnamedGunGame.use_barricade);
+        if (flagState == StateFlag.State.ALLOW) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }
