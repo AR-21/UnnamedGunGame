@@ -1,6 +1,9 @@
 package me.onatic.unnamedgungame.listeners;
 
 import me.onatic.unnamedgungame.BlockData;
+import me.onatic.unnamedgungame.UnnamedGunGame;
+
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -17,13 +20,22 @@ import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
+import java.util.HashMap;
+import java.util.Map;
 
 import java.util.Random;
 
 public class BarricadeListener implements Listener {
 
     private static final String BARRICADE_ITEM_NAME = "Deployable Barricade";
+    private boolean deployableBarricadeUsed = false;
+    private static final long COOLDOWN = 20L * 20;
+    private Map<Player, Boolean> cooldowns = new HashMap<>();
 
     private static final BlockData[][][][] STRUCTURES = new BlockData[][][][]{
             // First structure
@@ -180,14 +192,31 @@ public class BarricadeListener implements Listener {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
 
-        if (item != null && item.hasItemMeta()) {
+        // Check if the player is holding the barricade item
+        if (item != null && item.getType() == Material.STICK && item.hasItemMeta()) {
             ItemMeta meta = item.getItemMeta();
-            if (meta.hasDisplayName() && meta.getDisplayName().equals(BARRICADE_ITEM_NAME)) {
-                if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-                    player.launchProjectile(Egg.class);
-                    item.setAmount(item.getAmount() - 1);
-                    player.getInventory().setItemInMainHand(item);
-                    event.setCancelled(true);
+            if (meta.hasDisplayName() && meta.getDisplayName().contains(BARRICADE_ITEM_NAME)) {
+                // Check if the player is on cooldown
+                if (cooldowns.containsKey(player)) {
+                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "" + ChatColor.BOLD + "Not Ready!"));
+                    event.setCancelled(true); // Cancel the event to prevent the barricade from being thrown
+                } else {
+                    if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                        player.launchProjectile(Egg.class);
+                        item.setAmount(item.getAmount() - 1);
+                        player.getInventory().setItemInMainHand(item);
+                        event.setCancelled(true);
+                        deployableBarricadeUsed = true;
+                        cooldowns.put(player, true);
+
+                        // Schedule a task to remove the player from the cooldown list after the cooldown period
+                        new BukkitRunnable() {
+                            @Override
+                            public void run() {
+                                cooldowns.remove(player);
+                            }
+                        }.runTaskLater(JavaPlugin.getPlugin(UnnamedGunGame.class), COOLDOWN);
+                    }
                 }
             }
         }
@@ -195,15 +224,18 @@ public class BarricadeListener implements Listener {
 
     @EventHandler
     public void onProjectileHit(ProjectileHitEvent event) {
-        if (event.getEntity() instanceof Egg) {
-            Egg egg = (Egg) event.getEntity();
-            if (egg.getShooter() instanceof Player) {
-                Player player = (Player) egg.getShooter();
-                Vector direction = player.getLocation().getDirection();
-                BlockFace facing = getFacingDirection(direction);
-                int structureIndex = new Random().nextInt(STRUCTURES.length);
-                int variationIndex = (facing == BlockFace.NORTH || facing == BlockFace.SOUTH) ? 0 : 1;
-                createBarricade(event.getEntity().getLocation(), facing, structureIndex, variationIndex);
+        if (deployableBarricadeUsed == true) {
+            if (event.getEntity() instanceof Egg) {
+                Egg egg = (Egg) event.getEntity();
+                if (egg.getShooter() instanceof Player) {
+                    Player player = (Player) egg.getShooter();
+                    Vector direction = player.getLocation().getDirection();
+                    BlockFace facing = getFacingDirection(direction);
+                    int structureIndex = new Random().nextInt(STRUCTURES.length);
+                    int variationIndex = (facing == BlockFace.NORTH || facing == BlockFace.SOUTH) ? 0 : 1;
+                    createBarricade(event.getEntity().getLocation(), facing, structureIndex, variationIndex);
+                    deployableBarricadeUsed = false;
+                }
             }
         }
     }
@@ -223,6 +255,7 @@ public class BarricadeListener implements Listener {
 
     private void createBarricade(Location location, BlockFace facing, int structureIndex, int variationIndex) {
         BlockData[][] structure = STRUCTURES[structureIndex][variationIndex];
+        Map<Location, Material> originalBlocks = new HashMap<>();
         for (int x = 0; x < structure.length; x++) {
             for (int y = 0; y < structure[x].length; y++) {
                 BlockData blockData = structure[x][y];
@@ -230,16 +263,18 @@ public class BarricadeListener implements Listener {
                 switch (facing) {
                     case NORTH:
                     case SOUTH:
-                        block = location.getWorld().getBlockAt(location.getBlockX() + x, location.getBlockY() + y, location.getBlockZ());
+                        block = location.getWorld().getBlockAt(location.getBlockX() + x - 2, location.getBlockY() + y, location.getBlockZ());
                         break;
                     case EAST:
                     case WEST:
-                        block = location.getWorld().getBlockAt(location.getBlockX(), location.getBlockY() + y, location.getBlockZ() + x);
+                        block = location.getWorld().getBlockAt(location.getBlockX(), location.getBlockY() + y, location.getBlockZ() + x - 2);
                         break;
                     default:
                         throw new IllegalStateException("Unexpected value: " + facing);
                 }
-                block.setType(blockData.getMaterial());
+                if (block.getType() == Material.AIR) {
+                    originalBlocks.put(block.getLocation(), block.getType());
+                    block.setType(blockData.getMaterial());
                 if (block.getBlockData() instanceof Stairs) {
                     Stairs stairs = (Stairs) block.getBlockData();
                     stairs.setFacing(blockData.getBlockFace());
@@ -249,7 +284,16 @@ public class BarricadeListener implements Listener {
             }
         }
     }
-
+        startBarricadeTimer(originalBlocks);
+}
+    private void startBarricadeTimer(Map<Location, Material> originalBlocks) {
+        Bukkit.getScheduler().scheduleSyncDelayedTask(JavaPlugin.getProvidingPlugin(getClass()), () -> {
+            for (Map.Entry<Location, Material> entry : originalBlocks.entrySet()) {
+                entry.getKey().getBlock().setType(entry.getValue());
+            }
+            originalBlocks.clear();
+        }, 20L * 15); // 5 minutes
+        }
     public ItemStack createBarricadeItem() {
         ItemStack barricadeItem = new ItemStack(Material.STICK);
         ItemMeta meta = barricadeItem.getItemMeta();
