@@ -1,0 +1,21 @@
+name: ExampleItem
+type: DIAMOND_SWORD
+displayName: '&6Legendary Sword'
+lore:
+  - '&7This is a legendary sword.'
+  - '&7Handle with care.'
+enchantments:
+  - 'DAMAGE_ALL:5'
+  - 'FIRE_ASPECT:2'
+isConsumable: false
+charges: 0
+cooldown: 0
+activationTime: 0
+damage: 10.0
+maxStackSize: 1
+modelData: 0
+potionEffects:
+  - 'INCREASE_DAMAGE'
+  - 'REGENERATION'
+attributes:
+  - 'GENERIC_ATTACK_DAMAGE'

@@ -1,5 +1,7 @@
 package me.onatic.unnamedgungame.commands;
 
+import me.onatic.unnamedgungame.UnnamedGunGame;
+import me.onatic.unnamedgungame.items.ItemPropertiesManager;
 import me.onatic.unnamedgungame.listeners.BarricadeListener;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -14,8 +16,13 @@ import java.util.Map;
 
 public class CommandManager implements CommandExecutor {
 
+    private final UnnamedGunGame plugin;
     private Map<CommandSender, Countdown> countdowns = new HashMap<>();
     private static Countdown broadcastCountdown;
+
+    public CommandManager(UnnamedGunGame unnamedGunGame) {
+        this.plugin = unnamedGunGame;
+    }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -93,6 +100,16 @@ public class CommandManager implements CommandExecutor {
                         sender.sendMessage("This command can only be run by a player.");
                     }
                     break;
+                case "give":
+                    if (sender instanceof Player) {
+                        Player player = (Player) sender;
+                        ItemPropertiesManager itemPropertiesManager = new ItemPropertiesManager();
+                        CustomItemCommand customItemCommand = new CustomItemCommand(plugin, itemPropertiesManager);
+                        return customItemCommand.onCommand(sender, command, label, args);
+                    } else {
+                        sender.sendMessage("This command can only be run by a player.");
+                        return true;
+                    }
                 default:
                     sendCommandList(sender);
                     break;
@@ -103,10 +120,11 @@ public class CommandManager implements CommandExecutor {
 
         return false;
     }
-
     private void sendCommandList(CommandSender sender) {
         sender.sendMessage("List of available commands:");
-        sender.sendMessage("/ugg countdown <Hours> <Minutes> <Seconds> ");
+        sender.sendMessage("/ugg countdown <Hours> <Minutes> <Seconds>");
+        sender.sendMessage("/ugg barricade");
+        sender.sendMessage("/ugg give <player> <item> <quantity>");
         // Add more commands here
     }
 
