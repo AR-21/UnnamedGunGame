@@ -1,7 +1,7 @@
 package me.onatic.unnamedgungame.commands;
 
 import me.onatic.unnamedgungame.UnnamedGunGame;
-import me.onatic.unnamedgungame.items.ItemPropertiesManager;
+import me.onatic.unnamedgungame.items.CustomItemLoader;
 import me.onatic.unnamedgungame.listeners.BarricadeListener;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -100,16 +100,12 @@ public class CommandManager implements CommandExecutor {
                         sender.sendMessage("This command can only be run by a player.");
                     }
                     break;
+
                 case "give":
-                    if (sender instanceof Player) {
-                        Player player = (Player) sender;
-                        ItemPropertiesManager itemPropertiesManager = new ItemPropertiesManager();
-                        CustomItemCommand customItemCommand = new CustomItemCommand(plugin, itemPropertiesManager);
-                        return customItemCommand.onCommand(sender, command, label, args);
-                    } else {
-                        sender.sendMessage("This command can only be run by a player.");
-                        return true;
-                    }
+                    GiveCommand giveCommand = new GiveCommand();
+                    giveCommand.execute(sender, args);
+                    break;
+
                 default:
                     sendCommandList(sender);
                     break;

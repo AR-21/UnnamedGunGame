@@ -6,6 +6,7 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.regions.RegionContainer;
 import com.sk89q.worldguard.protection.regions.RegionQuery;
 import me.onatic.unnamedgungame.BlockData;
+import me.onatic.unnamedgungame.BlockStateData;
 import me.onatic.unnamedgungame.UnnamedGunGame;
 
 import org.bukkit.*;
@@ -280,7 +281,7 @@ public class BarricadeListener implements Listener {
 
     private void createBarricade(Location location, BlockFace facing, int structureIndex, int variationIndex) {
         BlockData[][] structure = STRUCTURES[structureIndex][variationIndex];
-        Map<Location, Material> originalBlocks = new HashMap<>();
+        Map<Location, BlockStateData> originalBlocks = new HashMap<>();
         for (int x = 0; x < structure.length; x++) {
             for (int y = 0; y < structure[x].length; y++) {
                 BlockData blockData = structure[x][y];
@@ -302,11 +303,11 @@ public class BarricadeListener implements Listener {
                     for (int dx = -2; dx <= 2; dx++) {
                         for (int dz = -2; dz <= 2; dz++) {
                             Block belowBlock = location.getWorld().getBlockAt(block.getX() + dx, block.getY() - 2, block.getZ() + dz);
-                            originalBlocks.put(belowBlock.getLocation(), belowBlock.getType());
+                            originalBlocks.put(belowBlock.getLocation(), new BlockStateData(belowBlock.getType(), belowBlock.getBlockData()));
                         }
                     }
 
-                    originalBlocks.put(block.getLocation(), block.getType());
+                    originalBlocks.put(block.getLocation(), new BlockStateData(block.getType(), block.getBlockData()));
                     block.setType(blockData.getMaterial());
                     if (block.getBlockData() instanceof Stairs) {
                         Stairs stairs = (Stairs) block.getBlockData();
@@ -320,14 +321,18 @@ public class BarricadeListener implements Listener {
         startBarricadeTimer(originalBlocks);
     }
 
-    private void startBarricadeTimer(Map<Location, Material> originalBlocks) {
+    private void startBarricadeTimer(Map<Location, BlockStateData> originalBlocks) {
         Bukkit.getScheduler().scheduleSyncDelayedTask(JavaPlugin.getProvidingPlugin(getClass()), () -> {
-            for (Map.Entry<Location, Material> entry : originalBlocks.entrySet()) {
-                entry.getKey().getBlock().setType(entry.getValue());
+            for (Map.Entry<Location, BlockStateData> entry : originalBlocks.entrySet()) {
+                Block block = entry.getKey().getBlock();
+                BlockStateData blockStateData = entry.getValue();
+                block.setType(blockStateData.getMaterial());
+                block.setBlockData(blockStateData.getBlockData());
             }
             originalBlocks.clear();
         }, 20L * 10); // 10 seconds
-        }
+    }
+
     public ItemStack createBarricadeItem() {
         ItemStack barricadeItem = new ItemStack(Material.STICK);
         ItemMeta meta = barricadeItem.getItemMeta();

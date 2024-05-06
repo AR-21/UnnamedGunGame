@@ -1,21 +1,9 @@
-name: TestItem
 type: DIAMOND_SWORD
-displayName: '&6Less Legendary Sword'
+name: custom_sword2
+displayName: '&6Custom Sword2'
 lore:
-  - '&7This is a legendary sword.'
-  - '&7Handle with care.'
+  - '&7This is a custom sword.'
+  - '&7It is very powerful.'
 enchantments:
   - 'DAMAGE_ALL:5'
   - 'FIRE_ASPECT:2'
-isConsumable: false
-charges: 0
-cooldown: 0
-activationTime: 0
-damage: 10.0
-maxStackSize: 1
-modelData: 0
-potionEffects:
-  - 'INCREASE_DAMAGE'
-  - 'REGENERATION'
-attributes:
-  - 'GENERIC_ATTACK_DAMAGE'

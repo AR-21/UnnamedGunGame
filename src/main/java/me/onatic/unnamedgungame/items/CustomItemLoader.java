@@ -1,12 +1,13 @@
 package me.onatic.unnamedgungame.items;
 
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -14,83 +15,61 @@ import java.util.List;
 
 public class CustomItemLoader {
 
-    private JavaPlugin plugin;
-    private ItemPropertiesManager itemPropertiesManager;
-
-    public CustomItemLoader(JavaPlugin plugin) {
-        this.plugin = plugin;
-        this.itemPropertiesManager = new ItemPropertiesManager();
-    }
-
-    public List<ItemStack> loadItems(String directoryName) {
-        File directory = new File(plugin.getDataFolder(), directoryName);
-        if (!directory.exists() || !directory.isDirectory()) {
-            return new ArrayList<>();
+    public ItemStack loadItem(String filePath) {
+        File file = new File(filePath);
+        if (!file.exists()) {
+            return null;
         }
 
-        File[] itemFiles = directory.listFiles();
-        List<ItemStack> items = new ArrayList<>();
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
 
-        for (File itemFile : itemFiles) {
-            FileConfiguration itemConfig = YamlConfiguration.loadConfiguration(itemFile);
-            ItemStack item = createItemStack(itemConfig);
-            items.add(item);
-        }
+        Material type = Material.valueOf(config.getString("type"));
+        String name = config.getString("name");
+        String displayName = ChatColor.translateAlternateColorCodes('&', config.getString("displayName"));
+        List<String> lore = config.getStringList("lore");
+        List<String> enchantments = config.getStringList("enchantments");
 
-        return items;
-    }
-
-    private ItemStack createItemStack(FileConfiguration itemConfig) {
-        String name = itemConfig.getString("name");
-        System.out.println("Loaded item: " + name);
-        String type = itemConfig.getString("type");
-        String displayName = itemConfig.getString("displayName");
-        List<String> lore = itemConfig.getStringList("lore");
-        List<String> enchantments = itemConfig.getStringList("enchantments");
-        boolean isConsumable = itemConfig.getBoolean("isConsumable", false);
-        int charges = itemConfig.getInt("charges", 0);
-        long cooldown = itemConfig.getLong("cooldown", 0L);
-        long activationTime = itemConfig.getLong("activationTime", 0L);
-        double damage = itemConfig.getDouble("damage", 0.0);
-        int maxStackSize = itemConfig.getInt("maxStackSize", 64);
-        int modelData = itemConfig.getInt("modelData", 0);
-        List<String> potionEffects = itemConfig.getStringList("potionEffects");
-        List<String> attributes = itemConfig.getStringList("attributes");
-
-        ItemStack item = new ItemStack(Material.valueOf(type), maxStackSize);
+        ItemStack item = new ItemStack(type);
         ItemMeta meta = item.getItemMeta();
 
-        if (displayName != null) {
+        if (meta != null) {
             meta.setDisplayName(displayName);
-        }
-
-        if (lore != null) {
             meta.setLore(lore);
-        }
 
-        if (enchantments != null) {
             for (String enchantment : enchantments) {
                 String[] parts = enchantment.split(":");
                 Enchantment ench = Enchantment.getByName(parts[0]);
                 int level = Integer.parseInt(parts[1]);
-                meta.addEnchant(ench, level, true);
+                if (ench != null) {
+                    meta.addEnchant(ench, level, true);
+                }
+            }
+
+            item.setItemMeta(meta);
+        }
+
+        return item;
+    }
+
+    public List<ItemStack> loadItemsFromDirectory(String directoryPath) {
+        File directory = new File(directoryPath);
+        if (!directory.exists() || !directory.isDirectory()) {
+            return null;
+        }
+
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return null;
+        }
+
+        List<ItemStack> items = new ArrayList<>();
+        for (File file : files) {
+            ItemStack item = loadItem(file.getPath());
+            if (item != null) {
+                items.add(item);
             }
         }
 
-        meta.setCustomModelData(modelData);
-        item.setItemMeta(meta);
-
-        // Store the new properties in the item's metadata
-        itemPropertiesManager.setConsumable(item, isConsumable);
-        itemPropertiesManager.setCharges(item, charges);
-        itemPropertiesManager.setCooldown(item, cooldown);
-        itemPropertiesManager.setActivationTime(item, activationTime);
-        itemPropertiesManager.setDamage(item, damage);
-        itemPropertiesManager.setModelData(item, modelData);
-        itemPropertiesManager.setPotionEffects(item, String.join(",", potionEffects));
-        itemPropertiesManager.setAttributes(item, String.join(",", attributes));
-        itemPropertiesManager.setName(item, name);
-
-        return item;
+        return items;
     }
 }

@@ -5,18 +5,26 @@ import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
 import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
+import me.onatic.unnamedgungame.database.DatabaseManager;
 import me.onatic.unnamedgungame.items.CustomItemLoader;
 import me.onatic.unnamedgungame.listeners.BarricadeListener;
 import me.onatic.unnamedgungame.commands.CommandManager;
-import org.bukkit.inventory.ItemStack;
+import me.onatic.unnamedgungame.listeners.KillListener;
+import me.onatic.unnamedgungame.listeners.ProneListener;
+import me.onatic.unnamedgungame.listeners.SuffocationDamageHandler;
+import me.onatic.unnamedgungame.database.PlayerStatsDatabaseHandler;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.List;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 public final class UnnamedGunGame extends JavaPlugin {
 
     public static StateFlag use_barricade;
     private CustomItemLoader itemLoader;
+    private DatabaseManager dbManager;
+    private PlayerStatsDatabaseHandler playerStatsDatabaseHandler;
+
     @Override
     public void onLoad() {
         FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
@@ -41,20 +49,44 @@ public final class UnnamedGunGame extends JavaPlugin {
     @Override
     public void onEnable() {
         // Plugin startup logic
+        dbManager = new DatabaseManager();
+        dbManager.connect();
+        playerStatsDatabaseHandler = new PlayerStatsDatabaseHandler(dbManager);
+
+        getServer().getPluginManager().registerEvents(new SuffocationDamageHandler(), this);
         getServer().getPluginManager().registerEvents(new BarricadeListener(), this);
+        getServer().getPluginManager().registerEvents(new ProneListener(this), this);
+        getServer().getPluginManager().registerEvents(new KillListener(playerStatsDatabaseHandler), this);
         this.getCommand("ugg").setExecutor(new CommandManager(this));
 
-        // Load the items
-        itemLoader = new CustomItemLoader(this);
-        List<ItemStack> items = itemLoader.loadItems("Items");
+        try (Statement statement = dbManager.getConnection().createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS player_stats (" +
+                    "player_uuid TEXT PRIMARY KEY," +
+                    "stat_name TEXT," +
+                    "stat_value INTEGER" +
+                    ")");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        // Load items on plugin enable
+        itemLoader = new CustomItemLoader();
+        itemLoader.loadItemsFromDirectory("Items");
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
+        dbManager.disconnect();
     }
 
     public CustomItemLoader getItemLoader() {
         return itemLoader;
+    }
+
+    public DatabaseManager getDatabaseManager() {
+        return dbManager;
+    }
+
+    public PlayerStatsDatabaseHandler getPlayerStatsDatabaseHandler() {
+        return playerStatsDatabaseHandler;
     }
 }
