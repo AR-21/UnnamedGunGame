@@ -189,7 +189,7 @@ public class ProneListener implements Listener {
             if (snow.getLayers() > 3) return false;
         }
         double blockHeight = block.getBoundingBox().getHeight();
-        if (blockHeight > 0.45 && blockHeight < 0.55) return false; // If the block's height is within the range of 0.4 to 0.6, prevent the player from going prone
+        if (blockHeight > 0.4375 && blockHeight < 0.55) return false; // If the block's height is within the range of 0.4 to 0.6, prevent the player from going prone
         return true;
     }
 

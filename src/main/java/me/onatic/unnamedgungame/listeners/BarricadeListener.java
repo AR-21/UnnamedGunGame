@@ -1,14 +1,11 @@
+
 package me.onatic.unnamedgungame.listeners;
 
-import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import com.sk89q.worldguard.WorldGuard;
-import com.sk89q.worldguard.protection.flags.StateFlag;
-import com.sk89q.worldguard.protection.regions.RegionContainer;
-import com.sk89q.worldguard.protection.regions.RegionQuery;
-import me.onatic.unnamedgungame.BlockData;
-import me.onatic.unnamedgungame.BlockStateData;
-import me.onatic.unnamedgungame.UnnamedGunGame;
 
+import me.onatic.unnamedgungame.utils.BlockData;
+import me.onatic.unnamedgungame.utils.BlockStateData;
+import me.onatic.unnamedgungame.UnnamedGunGame;
+import me.onatic.unnamedgungame.items.BarricadeItemHandler;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -32,6 +29,11 @@ import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.sk89q.worldguard.protection.ApplicableRegionSet;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
+import com.sk89q.worldguard.WorldGuard;
+import com.sk89q.worldguard.protection.flags.StateFlag;
+import com.sk89q.worldguard.protection.regions.RegionContainer;
+import com.sk89q.worldguard.protection.regions.RegionQuery;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,163 +41,18 @@ import java.util.Random;
 
 public class BarricadeListener implements Listener {
 
-    private static final String BARRICADE_ITEM_NAME = "Deployable Barricade";
     private boolean deployableBarricadeUsed = false;
     private static final long COOLDOWN = 20L * 15;
+    private static BarricadeItemHandler barricadeItemHandler;
+    private static final BlockData[][][][] STRUCTURES;
 
     private Map<Player, Boolean> cooldowns = new HashMap<>();
     private Map<Player, Long> soundCooldowns = new HashMap<>();
 
-    private static final BlockData[][][][] STRUCTURES = new BlockData[][][][]{
-            // First structure
-            {
-                    // SOUTH/NORTH variation
-                    {
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.EAST, false),
-                                    new BlockData(Material.AIR, BlockFace.NORTH, false),
-                            },
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, true),
-                            },
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.EAST, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, false),
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.EAST, true),
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false),
-                            }
-                    },
-                    // EAST/WEST variation
-                    {
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.SOUTH, false),
-                                    new BlockData(Material.AIR, BlockFace.NORTH, false),
-                            },
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, true),
-                            },
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.SOUTH, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, false),
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.EAST, true),
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false),
-                            }
-                    }
-            },
-            // Second structure
-            {
-                    // SOUTH/NORTH variation
-                    {
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, true),
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, true)
-                            }
-                    },
-                    // EAST/WEST variation
-                    {
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, true),
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, true)
-                            }
-                    }
-            },
-            // Third structure
-            {
-                    // SOUTH/NORTH variation
-                    {
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.EAST, true)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.WEST, true)
-                            }
-                    },
-                    // EAST/WEST variation
-                    {
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.SOUTH, true)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_PLANKS, BlockFace.NORTH, false)
-                            },
-                            {
-                                    new BlockData(Material.OAK_SLAB, BlockFace.NORTH, false),
-                                    new BlockData(Material.OAK_STAIRS, BlockFace.NORTH, true)
-                            }
-                    }
-            }
-    };
-
+    static {
+        barricadeItemHandler = new BarricadeItemHandler();
+        STRUCTURES = barricadeItemHandler.getStructures();
+    }
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
@@ -205,7 +62,7 @@ public class BarricadeListener implements Listener {
         // Check if the player is holding the barricade item
         if (item != null && item.getType() == Material.STICK && item.hasItemMeta()) {
             ItemMeta meta = item.getItemMeta();
-            if (meta.hasDisplayName() && meta.getDisplayName().contains(BARRICADE_ITEM_NAME)) {
+            if (meta.hasDisplayName() && meta.getDisplayName().contains(barricadeItemHandler.getBarricadeItemName())) {
 
                 // Check if the player is in a region with the use-barricade flag
                 if (!canUseBarricade(player.getLocation())) {
@@ -214,11 +71,11 @@ public class BarricadeListener implements Listener {
                 }
                 // Check if the player is on cooldown
                 if (cooldowns.containsKey(player)) {
-                        long lastSoundPlayed = soundCooldowns.getOrDefault(player, 0L);
-                        if (System.currentTimeMillis() - lastSoundPlayed >= 1000) {
-                            player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_PLACE, 1.0F, 1.0F);
-                            soundCooldowns.put(player, System.currentTimeMillis());
-                        }
+                    long lastSoundPlayed = soundCooldowns.getOrDefault(player, 0L);
+                    if (System.currentTimeMillis() - lastSoundPlayed >= 1000) {
+                        player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_PLACE, 1.0F, 1.0F);
+                        soundCooldowns.put(player, System.currentTimeMillis());
+                    }
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "" + ChatColor.BOLD + "Not Ready!"));
                     event.setCancelled(true); // Cancel the event to prevent the barricade from being thrown
                 } else {
@@ -333,25 +190,18 @@ public class BarricadeListener implements Listener {
         }, 20L * 10); // 10 seconds
     }
 
-    public ItemStack createBarricadeItem() {
-        ItemStack barricadeItem = new ItemStack(Material.STICK);
-        ItemMeta meta = barricadeItem.getItemMeta();
-        meta.setDisplayName(ChatColor.BLUE + "" + ChatColor.BOLD + BARRICADE_ITEM_NAME);
-        barricadeItem.setItemMeta(meta);
-        return barricadeItem;
-    }
-private boolean canUseBarricade(Location location) {
-    RegionContainer container = WorldGuard.getInstance().getPlatform().getRegionContainer();
-    RegionQuery query = container.createQuery();
-    ApplicableRegionSet applicableRegions = query.getApplicableRegions(BukkitAdapter.adapt(location));
+    private boolean canUseBarricade(Location location) {
+        RegionContainer container = WorldGuard.getInstance().getPlatform().getRegionContainer();
+        RegionQuery query = container.createQuery();
+        ApplicableRegionSet applicableRegions = query.getApplicableRegions(BukkitAdapter.adapt(location));
 
-    for (ProtectedRegion region : applicableRegions) {
-        StateFlag.State flagState = region.getFlag(UnnamedGunGame.use_barricade);
-        if (flagState == StateFlag.State.ALLOW) {
-            return true;
+        for (ProtectedRegion region : applicableRegions) {
+            StateFlag.State flagState = region.getFlag(UnnamedGunGame.use_barricade);
+            if (flagState == StateFlag.State.ALLOW) {
+                return true;
+            }
         }
+        return false;
     }
-    return false;
-}
 
 }

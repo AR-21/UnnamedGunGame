@@ -6,12 +6,11 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
 import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
 import me.onatic.unnamedgungame.database.DatabaseManager;
+import me.onatic.unnamedgungame.handlers.SuffocationDamageHandler;
+import me.onatic.unnamedgungame.items.Consumables.Stim;
 import me.onatic.unnamedgungame.items.CustomItemLoader;
-import me.onatic.unnamedgungame.listeners.BarricadeListener;
+import me.onatic.unnamedgungame.listeners.*;
 import me.onatic.unnamedgungame.commands.CommandManager;
-import me.onatic.unnamedgungame.listeners.KillListener;
-import me.onatic.unnamedgungame.listeners.ProneListener;
-import me.onatic.unnamedgungame.listeners.SuffocationDamageHandler;
 import me.onatic.unnamedgungame.database.PlayerStatsDatabaseHandler;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -21,29 +20,15 @@ import java.sql.Statement;
 public final class UnnamedGunGame extends JavaPlugin {
 
     public static StateFlag use_barricade;
+    public static StateFlag heal_on_kill;
     private CustomItemLoader itemLoader;
     private DatabaseManager dbManager;
     private PlayerStatsDatabaseHandler playerStatsDatabaseHandler;
 
     @Override
     public void onLoad() {
-        FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
-        try {
-            // create a flag with the name "my-custom-flag", defaulting to true
-            StateFlag flag = new StateFlag("use-barricade", true);
-            registry.register(flag);
-            use_barricade = flag; // only set our field if there was no error
-        } catch (FlagConflictException e) {
-            // some other plugin registered a flag by the same name already.
-            // you can use the existing flag, but this may cause conflicts - be sure to check type
-            Flag<?> existing = registry.get("use-barricade");
-            if (existing instanceof StateFlag) {
-                use_barricade = (StateFlag) existing;
-            } else {
-                // types don't match - this is bad news! some other plugin conflicts with you
-                // hopefully this never actually happens
-            }
-        }
+        use_barricade = registerFlag("use-barricade", true);
+        heal_on_kill = registerFlag("heal-on-kill", false);
     }
 
     @Override
@@ -57,6 +42,9 @@ public final class UnnamedGunGame extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new BarricadeListener(), this);
         getServer().getPluginManager().registerEvents(new ProneListener(this), this);
         getServer().getPluginManager().registerEvents(new KillListener(playerStatsDatabaseHandler), this);
+        getServer().getPluginManager().registerEvents(new PlayerRespawnListener(), this);
+        getServer().getPluginManager().registerEvents(new Stim(1, 1000L, 5000L, this), this);
+
         this.getCommand("ugg").setExecutor(new CommandManager(this));
 
         try (Statement statement = dbManager.getConnection().createStatement()) {
@@ -78,6 +66,23 @@ public final class UnnamedGunGame extends JavaPlugin {
         dbManager.disconnect();
     }
 
+    private StateFlag registerFlag(String flagName, boolean defaultValue) {
+        FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
+        try {
+            StateFlag flag = new StateFlag(flagName, defaultValue);
+            registry.register(flag);
+            return flag;
+        } catch (FlagConflictException e) {
+            Flag<?> existing = registry.get(flagName);
+            if (existing instanceof StateFlag) {
+                return (StateFlag) existing;
+            } else {
+                // types don't match - this is bad news! some other plugin conflicts with you
+                // hopefully this never actually happens
+                return null;
+            }
+        }
+    }
     public CustomItemLoader getItemLoader() {
         return itemLoader;
     }
